@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+video_interview.db
+.DS_Store

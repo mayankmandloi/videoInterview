@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% set title = "Admin Console" %}
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>Interview Admin</h1>
+    <p class="muted">Create candidate links and review completed interviews.</p>
+  </div>
+  <form method="post" action="/admin/logout">
+    <button class="secondary" type="submit">Logout</button>
+  </form>
+</header>
+
+<section class="panel">
+  <h2>Schedule Interview</h2>
+  <form method="post" action="/admin/interviews" class="grid-form">
+    <label>
+      Candidate name
+      <input name="candidate_name" required>
+    </label>
+    <label>
+      Candidate email
+      <input name="candidate_email" type="email" required>
+    </label>
+    <label>
+      Role
+      <input name="role" placeholder="Senior Python Developer" required>
+    </label>
+    <label>
+      Duration minutes
+      <input name="duration_minutes" type="number" value="20" min="5" max="90" required>
+    </label>
+    <label class="span-2">
+      Skills to assess
+      <textarea name="skills" rows="3" placeholder="Python, FastAPI, system design, SQL" required></textarea>
+    </label>
+    <button type="submit">Create interview link</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Interviews</h2>
+  {% if interviews %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Candidate</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Link</th>
+          <th>Report</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for interview in interviews %}
+        <tr>
+          <td>
+            <strong>{{ interview.candidate_name }}</strong>
+            <span>{{ interview.candidate_email }}</span>
+          </td>
+          <td>{{ interview.role }}</td>
+          <td><span class="badge">{{ interview.status }}</span></td>
+          <td>
+            <input class="link-box" readonly value="{{ base_url }}/interview/{{ interview.token }}">
+          </td>
+          <td><a href="/admin/interviews/{{ interview.id }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No interviews created yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

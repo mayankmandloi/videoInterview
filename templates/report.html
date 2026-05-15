@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% set title = "Interview Report" %}
+{% block content %}
+<header class="topbar">
+  <div>
+    <a href="/admin">Back to admin</a>
+    <h1>{{ interview.candidate_name }}</h1>
+    <p class="muted">{{ interview.role }} · {{ interview.skills }}</p>
+  </div>
+  <span class="badge">{{ interview.status }}</span>
+</header>
+
+{% if interview.report %}
+<section class="score-grid">
+  <div class="panel">
+    <h2>Score</h2>
+    <div class="score">{{ interview.report.score }}</div>
+    <p class="muted">Recommendation: {{ interview.report.recommendation }}</p>
+  </div>
+  <div class="panel">
+    <h2>Summary</h2>
+    <p>{{ interview.report.summary }}</p>
+  </div>
+</section>
+<section class="score-grid">
+  <div class="panel">
+    <h2>Strengths</h2>
+    <pre>{{ interview.report.strengths }}</pre>
+  </div>
+  <div class="panel">
+    <h2>Concerns</h2>
+    <pre>{{ interview.report.concerns }}</pre>
+  </div>
+</section>
+{% else %}
+<section class="panel">
+  <h2>No report yet</h2>
+  <p class="muted">The report appears after the candidate finishes the interview.</p>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Transcript</h2>
+  {% if interview.turns %}
+  <div class="transcript">
+    {% for turn in interview.turns %}
+    <div class="turn {{ turn.speaker }}">
+      <strong>{{ turn.speaker }}</strong>
+      <p>{{ turn.text }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No transcript captured yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

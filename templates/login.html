@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% set title = "Admin Login" %}
+{% block content %}
+<section class="auth-panel">
+  <h1>Admin Login</h1>
+  <p class="muted">Sign in to schedule and review AI interviews.</p>
+  {% if error %}
+  <div class="alert">{{ error }}</div>
+  {% endif %}
+  <form method="post" action="/admin/login" class="stack">
+    <label>
+      Username
+      <input name="username" autocomplete="username" required>
+    </label>
+    <label>
+      Password
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">Sign in</button>
+  </form>
+</section>
+{% endblock %}

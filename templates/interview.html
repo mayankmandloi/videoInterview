@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% set title = "Candidate Interview" %}
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>{{ interview.role }} Interview</h1>
+    <p class="muted">{{ interview.candidate_name }} · {{ interview.duration_minutes }} minutes</p>
+  </div>
+  <span class="badge" id="status">{{ interview.status }}</span>
+</header>
+
+<section id="consent" class="panel">
+  <h2>Consent</h2>
+  <p>This POC will use your camera and microphone for a LiveKit room. An AI interviewer will join as a real room participant and conduct the interview by voice.</p>
+  <label class="check-row">
+    <input id="consentCheck" type="checkbox">
+    I consent to participate in this AI interview.
+  </label>
+  <button id="startBtn" type="button" disabled>Start interview</button>
+</section>
+
+<section id="room" class="room hidden">
+  <div class="video-panel">
+    <div id="videoContainer" class="video-box">
+      <div class="placeholder">Camera preview appears here</div>
+    </div>
+    <div id="remoteParticipants" class="remote-grid"></div>
+    <div class="controls">
+      <button id="muteBtn" class="secondary" type="button">Mute</button>
+      <button id="cameraBtn" class="secondary" type="button">Camera off</button>
+      <button id="finishBtn" class="danger" type="button">Finish interview</button>
+    </div>
+  </div>
+  <div class="interview-panel">
+    <h2>AI Interviewer</h2>
+    <div id="question" class="question">The AI interviewer will join after you enter the room. Answer by speaking naturally.</div>
+    <div id="transcript" class="mini-transcript"></div>
+    <textarea id="answer" rows="5" placeholder="Optional notes for the admin report. Voice conversation happens in the LiveKit room."></textarea>
+    <div class="controls">
+      <button id="sendBtn" type="button">Save note</button>
+    </div>
+    <div id="result" class="result hidden"></div>
+  </div>
+</section>
+
+<script type="module">
+  import { createLocalTracks, Room, RoomEvent, Track } from "https://cdn.jsdelivr.net/npm/livekit-client@2.18.9/dist/livekit-client.esm.mjs";
+
+  const token = "{{ interview.token }}";
+  const consentCheck = document.getElementById("consentCheck");
+  const startBtn = document.getElementById("startBtn");
+  const consent = document.getElementById("consent");
+  const roomEl = document.getElementById("room");
+  const questionEl = document.getElementById("question");
+  const transcriptEl = document.getElementById("transcript");
+  const answerEl = document.getElementById("answer");
+  const sendBtn = document.getElementById("sendBtn");
+  const finishBtn = document.getElementById("finishBtn");
+  const muteBtn = document.getElementById("muteBtn");
+  const cameraBtn = document.getElementById("cameraBtn");
+  const statusEl = document.getElementById("status");
+  const resultEl = document.getElementById("result");
+  const videoContainer = document.getElementById("videoContainer");
+  const remoteParticipants = document.getElementById("remoteParticipants");
+
+  let room;
+  let audioTrack;
+  let videoTrack;
+
+  consentCheck.addEventListener("change", () => {
+    startBtn.disabled = !consentCheck.checked;
+  });
+
+  function addTurn(speaker, text) {
+    const div = document.createElement("div");
+    div.className = `turn ${speaker}`;
+    div.innerHTML = `<strong>${speaker}</strong><p></p>`;
+    div.querySelector("p").textContent = text;
+    transcriptEl.appendChild(div);
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  }
+
+  function participantCard(participant) {
+    let card = document.getElementById(`participant-${participant.identity}`);
+    if (!card) {
+      card = document.createElement("div");
+      card.id = `participant-${participant.identity}`;
+      card.className = "participant-card";
+      card.innerHTML = `<strong></strong><div class="media"></div><span>connected</span>`;
+      card.querySelector("strong").textContent = participant.name || participant.identity;
+      remoteParticipants.appendChild(card);
+    }
+    return card;
+  }
+
+  function attachRemoteTrack(track, participant) {
+    const card = participantCard(participant);
+    const media = card.querySelector(".media");
+    const element = track.attach();
+    if (track.kind === Track.Kind.Video) {
+      media.innerHTML = "";
+      media.appendChild(element);
+    } else if (track.kind === Track.Kind.Audio) {
+      card.appendChild(element);
+    }
+  }
+
+  startBtn.addEventListener("click", async () => {
+    startBtn.disabled = true;
+    const response = await fetch(`/api/interviews/${token}/start`, { method: "POST" });
+    if (!response.ok) {
+      questionEl.textContent = "Unable to start interview. Check LiveKit and Azure settings.";
+      startBtn.disabled = false;
+      return;
+    }
+    const data = await response.json();
+    consent.classList.add("hidden");
+    roomEl.classList.remove("hidden");
+    statusEl.textContent = "in_progress";
+    questionEl.textContent = `Joining room ${data.room}. Waiting for ${data.agentName} to connect...`;
+
+    try {
+      const tracks = await createLocalTracks({ audio: true, video: true });
+      audioTrack = tracks.find((track) => track.kind === "audio");
+      videoTrack = tracks.find((track) => track.kind === "video");
+      videoContainer.innerHTML = "";
+      if (videoTrack) videoContainer.appendChild(videoTrack.attach());
+      room = new Room();
+      room.on(RoomEvent.ParticipantConnected, (participant) => {
+        participantCard(participant);
+        addTurn("system", `${participant.name || participant.identity} joined the room.`);
+      });
+      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        attachRemoteTrack(track, participant);
+      });
+      room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        const card = document.getElementById(`participant-${participant.identity}`);
+        if (card) card.remove();
+        addTurn("system", `${participant.name || participant.identity} left the room.`);
+      });
+      await room.connect(data.livekitUrl, data.livekitToken);
+      await Promise.all(tracks.map((track) => room.localParticipant.publishTrack(track)));
+      const dispatchResponse = await fetch(`/api/interviews/${token}/dispatch-agent`, { method: "POST" });
+      const dispatchData = await dispatchResponse.json();
+      if (!dispatchResponse.ok) {
+        questionEl.textContent = dispatchData.detail || "Joined the room, but could not dispatch the AI interviewer.";
+        addTurn("system", questionEl.textContent);
+        return;
+      }
+      addTurn("system", `${dispatchData.agentName} dispatch requested.`);
+      room.remoteParticipants.forEach((participant) => {
+        participantCard(participant);
+        participant.trackPublications.forEach((publication) => {
+          if (publication.track) attachRemoteTrack(publication.track, participant);
+        });
+      });
+      questionEl.textContent = "You are in the room. Speak naturally with the AI interviewer.";
+    } catch (error) {
+      videoContainer.innerHTML = `<div class="placeholder">Video unavailable: ${error.message}</div>`;
+    }
+  });
+
+  sendBtn.addEventListener("click", async () => {
+    const answer = answerEl.value.trim();
+    if (!answer) return;
+    sendBtn.disabled = true;
+    addTurn("note", answer);
+    answerEl.value = "";
+
+    const response = await fetch(`/api/interviews/${token}/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer }),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      questionEl.textContent = "Note saved. Continue speaking with the AI interviewer.";
+    } else {
+      questionEl.textContent = data.detail || "Unable to get next question.";
+    }
+    sendBtn.disabled = false;
+  });
+
+  finishBtn.addEventListener("click", async () => {
+    finishBtn.disabled = true;
+    resultEl.classList.remove("hidden");
+    resultEl.textContent = "Generating report...";
+    const response = await fetch(`/api/interviews/${token}/finish`, { method: "POST" });
+    const data = await response.json();
+    if (room) room.disconnect();
+    statusEl.textContent = "completed";
+    resultEl.innerHTML = response.ok
+      ? `<strong>Completed.</strong><p>Score: ${data.score}. Recommendation: ${data.recommendation}.</p><p>${data.summary}</p>`
+      : `<strong>Unable to finish.</strong><p>${data.detail || "Check Azure OpenAI settings."}</p>`;
+  });
+
+  muteBtn.addEventListener("click", async () => {
+    if (!audioTrack) return;
+    audioTrack.isMuted ? await audioTrack.unmute() : await audioTrack.mute();
+    muteBtn.textContent = audioTrack.isMuted ? "Unmute" : "Mute";
+  });
+
+  cameraBtn.addEventListener("click", async () => {
+    if (!videoTrack) return;
+    videoTrack.isMuted ? await videoTrack.unmute() : await videoTrack.mute();
+    cameraBtn.textContent = videoTrack.isMuted ? "Camera on" : "Camera off";
+  });
+
+</script>
+{% endblock %}
