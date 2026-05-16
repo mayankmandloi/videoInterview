@@ -44,3 +44,35 @@ services:
         sync: false
       - key: PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
         value: python
+
+  - type: worker
+    name: video-interview-agent
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -m app.agent"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVEKIT_AGENT_NAME
+        sync: false
+      - key: LIVEKIT_INFERENCE_STT_MODEL
+        sync: false
+      - key: LIVEKIT_INFERENCE_STT_LANGUAGE
+        sync: false
+      - key: LIVEKIT_INFERENCE_LLM_MODEL
+        sync: false
+      - key: LIVEKIT_INFERENCE_TTS_MODEL
+        sync: false
+      - key: LIVEKIT_INFERENCE_TTS_VOICE
+        sync: false
+      - key: PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
+        value: python
+      - key: DATABASE_URL
+        sync: false
