@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: video-interview-app
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: APP_BASE_URL
+        value: https://video-interview-app.onrender.com
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_API_VERSION
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVEKIT_AGENT_NAME
+        sync: false
+      - key: LIVEKIT_INFERENCE_STT_MODEL
+        sync: false
+      - key: LIVEKIT_INFERENCE_STT_LANGUAGE
+        sync: false
+      - key: LIVEKIT_INFERENCE_LLM_MODEL
+        sync: false
+      - key: LIVEKIT_INFERENCE_TTS_MODEL
+        sync: false
+      - key: LIVEKIT_INFERENCE_TTS_VOICE
+        sync: false
+      - key: PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
+        value: python
