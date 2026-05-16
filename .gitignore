@@ -4,3 +4,4 @@ __pycache__/
 .env
 video_interview.db
 .DS_Store
+my-key.pem

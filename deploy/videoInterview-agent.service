@@ -1,0 +1,14 @@
+[Unit]
+Description=Video Interview LiveKit Agent
+After=network.target
+
+[Service]
+User=azureuser
+WorkingDirectory=/home/azureuser/videoInterview
+EnvironmentFile=/home/azureuser/videoInterview/.env
+ExecStart=/home/azureuser/videoInterview/.venv/bin/python -m app.agent start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Video Interview Web Server (FastAPI)
+After=network.target
+
+[Service]
+User=azureuser
+WorkingDirectory=/home/azureuser/videoInterview
+EnvironmentFile=/home/azureuser/videoInterview/.env
+ExecStart=/home/azureuser/videoInterview/.venv/bin/gunicorn \
+    -w 1 \
+    -k uvicorn.workers.UvicornWorker \
+    app.main:app \
+    --bind 0.0.0.0:8000 \
+    --access-logfile - \
+    --error-logfile -
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
