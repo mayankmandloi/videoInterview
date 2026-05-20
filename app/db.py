@@ -45,6 +45,11 @@ class Interview(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    cheating_flags: Mapped[list["CheatingFlag"]] = relationship(
+        back_populates="interview",
+        cascade="all, delete-orphan",
+        order_by="CheatingFlag.id",
+    )
 
 
 class TranscriptTurn(Base):
@@ -72,6 +77,18 @@ class Report(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     interview: Mapped[Interview] = relationship(back_populates="report")
+
+
+class CheatingFlag(Base):
+    __tablename__ = "cheating_flags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    interview_id: Mapped[int] = mapped_column(ForeignKey("interviews.id"), index=True)
+    flag_type: Mapped[str] = mapped_column(String(64))
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    interview: Mapped[Interview] = relationship(back_populates="cheating_flags")
 
 
 settings = get_settings()

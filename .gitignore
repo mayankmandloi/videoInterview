@@ -5,3 +5,5 @@ __pycache__/
 video_interview.db
 .DS_Store
 my-key.pem
+.antigravitycli/**/*
+.azure/**/*

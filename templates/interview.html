@@ -109,7 +109,14 @@
     startBtn.disabled = true;
     const response = await fetch(`/api/interviews/${token}/start`, { method: "POST" });
     if (!response.ok) {
-      questionEl.textContent = "Unable to start interview. Check LiveKit and Azure settings.";
+      let detail = "Unable to start interview. Check LiveKit and Azure settings.";
+      try {
+        const errorData = await response.json();
+        if (errorData.detail) {
+          detail = `Unable to start interview: ${errorData.detail}`;
+        }
+      } catch (_) {}
+      questionEl.textContent = detail;
       startBtn.disabled = false;
       return;
     }
@@ -124,7 +131,11 @@
       audioTrack = tracks.find((track) => track.kind === "audio");
       videoTrack = tracks.find((track) => track.kind === "video");
       videoContainer.innerHTML = "";
-      if (videoTrack) videoContainer.appendChild(videoTrack.attach());
+      if (videoTrack) {
+        const videoEl = videoTrack.attach();
+        videoContainer.appendChild(videoEl);
+        startFaceDetection(videoEl);
+      }
       room = new Room();
       room.on(RoomEvent.ParticipantConnected, (participant) => {
         participantCard(participant);
@@ -139,6 +150,8 @@
         addTurn("system", `${participant.name || participant.identity} left the room.`);
       });
       await room.connect(data.livekitUrl, data.livekitToken);
+      interviewStarted = true;
+      enterFullscreen();
       await Promise.all(tracks.map((track) => room.localParticipant.publishTrack(track)));
       const dispatchResponse = await fetch(`/api/interviews/${token}/dispatch-agent`, { method: "POST" });
       const dispatchData = await dispatchResponse.json();
@@ -205,6 +218,180 @@
     videoTrack.isMuted ? await videoTrack.unmute() : await videoTrack.mute();
     cameraBtn.textContent = videoTrack.isMuted ? "Camera on" : "Camera off";
   });
+
+  // ── Anti-cheating detection ──────────────────────────────────────────────
+  let interviewStarted = false;
+  let noFaceSeconds = 0;
+
+  async function flagCheating(flagType, detail = null) {
+    try {
+      await fetch(`/api/interviews/${token}/flag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flag_type: flagType, detail }),
+      });
+    } catch (_) {}
+  }
+
+  // Tab switch detection
+  document.addEventListener("visibilitychange", () => {
+    if (!interviewStarted) return;
+    if (document.hidden) {
+      addTurn("system", "⚠️ Warning: Tab switch detected. This has been recorded.");
+      flagCheating("tab_switch", `at ${new Date().toISOString()}`);
+    }
+  });
+
+  // Copy / paste / cut block
+  ["copy", "cut", "paste"].forEach(evt => {
+    document.addEventListener(evt, e => {
+      if (!interviewStarted) return;
+      e.preventDefault();
+      addTurn("system", "⚠️ Copy/paste is not allowed during the interview. This has been recorded.");
+      flagCheating("copy_paste_attempt", evt);
+    });
+  });
+
+  // Fullscreen management
+  async function enterFullscreen() {
+    try { await document.documentElement.requestFullscreen(); } catch (_) {}
+  }
+  document.addEventListener("fullscreenchange", () => {
+    if (!interviewStarted) return;
+    if (!document.fullscreenElement) {
+      addTurn("system", "⚠️ Fullscreen exit detected. Returning to fullscreen. This has been recorded.");
+      flagCheating("fullscreen_exit", `at ${new Date().toISOString()}`);
+      setTimeout(enterFullscreen, 1000);
+    }
+  });
+
+  // Face detection via @vladmandic/face-api (maintained fork)
+  async function startFaceDetection(videoEl) {
+    try {
+      const waitForVideoReady = () => new Promise((res) => {
+        const check = () => {
+          if (videoEl.readyState >= 2 && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+            res();
+          } else {
+            setTimeout(check, 200);
+          }
+        };
+        check();
+      });
+      await waitForVideoReady();
+
+      videoEl.muted = true;
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
+
+      const statusLabel = document.createElement('div');
+      statusLabel.id = 'faceStatus';
+      statusLabel.style.position = 'absolute';
+      statusLabel.style.bottom = '16px';
+      statusLabel.style.left = '16px';
+      statusLabel.style.padding = '8px 12px';
+      statusLabel.style.background = 'rgba(0,0,0,0.65)';
+      statusLabel.style.color = '#fff';
+      statusLabel.style.fontSize = '0.9rem';
+      statusLabel.style.borderRadius = '8px';
+      statusLabel.style.zIndex = '10';
+      statusLabel.textContent = 'Face detection starting...';
+      videoContainer.style.position = 'relative';
+      videoContainer.appendChild(statusLabel);
+
+      let useBrowserFaceDetector = false;
+      let faceDetector;
+      let useFaceApi = false;
+      let faceApiModelUrl = null;
+
+      if ('FaceDetector' in window) {
+        faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 10 });
+        useBrowserFaceDetector = true;
+        statusLabel.textContent = 'Face detection: native FaceDetector API';
+        console.log('Face detection: using native FaceDetector API');
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
+        document.head.appendChild(script);
+        await new Promise((res, rej) => { script.onload = res; script.onerror = rej; });
+
+        faceApiModelUrl = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/weights';
+        try {
+          await faceapi.nets.tinyFaceDetector.loadFromUri(faceApiModelUrl);
+        } catch (firstError) {
+          faceApiModelUrl = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+          await faceapi.nets.tinyFaceDetector.loadFromUri(faceApiModelUrl);
+        }
+        useFaceApi = true;
+        statusLabel.textContent = `Face detection: faceapi (${faceApiModelUrl})`;
+        console.log('Face detection: using faceapi tinyFaceDetector', faceApiModelUrl);
+      }
+
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = videoEl.videoWidth;
+      captureCanvas.height = videoEl.videoHeight;
+      const captureCtx = captureCanvas.getContext('2d');
+      let lastCount = 0;
+      let multipleFaceWarnings = 0;
+
+      console.log('Face detection ready. Video size:', videoEl.videoWidth, 'x', videoEl.videoHeight);
+
+      setInterval(async () => {
+        if (!interviewStarted) return;
+        if (videoEl.videoWidth === 0 || videoEl.videoHeight === 0 || videoEl.paused) return;
+
+        if (captureCanvas.width !== videoEl.videoWidth || captureCanvas.height !== videoEl.videoHeight) {
+          captureCanvas.width = videoEl.videoWidth;
+          captureCanvas.height = videoEl.videoHeight;
+        }
+        captureCtx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
+
+        try {
+          let detections = [];
+
+          if (useBrowserFaceDetector) {
+            detections = await faceDetector.detect(captureCanvas);
+          } else if (useFaceApi) {
+            const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 });
+            detections = await faceapi.detectAllFaces(captureCanvas, options);
+          }
+
+          const count = Array.isArray(detections) ? detections.length : 0;
+          console.log('Face detection result count:', count);
+          statusLabel.textContent = `Faces detected: ${count}`;
+
+          if (count === 0) {
+            noFaceSeconds += 2.5;
+            if (noFaceSeconds >= 10) {
+              addTurn('system', '⚠️ No face detected. Please ensure you are visible on camera.');
+              flagCheating('no_face_detected', `missing for ${Math.round(noFaceSeconds)}s`);
+              noFaceSeconds = 0;
+            }
+          } else {
+            noFaceSeconds = 0;
+          }
+
+          if (count > 1) {
+            multipleFaceWarnings += 1;
+            if (multipleFaceWarnings >= 2 || count >= 3) {
+              addTurn('system', `⚠️ ${count} faces detected. Only the candidate should be on camera.`);
+              flagCheating('multiple_faces', `${count} faces detected`);
+              multipleFaceWarnings = 0;
+            }
+          } else {
+            multipleFaceWarnings = 0;
+          }
+
+          lastCount = count;
+        } catch (err) {
+          console.warn('Face detection error:', err);
+          statusLabel.textContent = `Face detection error: ${err.message || err}`;
+        }
+      }, 2500);
+    } catch (err) {
+      console.warn('Face detection unavailable:', err);
+    }
+  }
 
 </script>
 {% endblock %}

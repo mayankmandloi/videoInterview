@@ -1,10 +1,13 @@
 import json
+import logging
 from typing import Any
 
 from openai import AzureOpenAI, OpenAI
 
 from app.config import get_settings
 from app.db import Interview, TranscriptTurn
+
+logger = logging.getLogger("videoInterview.azure_openai")
 
 
 def _client() -> AzureOpenAI | OpenAI:
@@ -94,11 +97,38 @@ Transcript:
         response_format={"type": "json_object"},
     )
     content = response.choices[0].message.content or "{}"
-    parsed = json.loads(content)
-    return {
+    logger.info(
+        "Azure OpenAI report response for interview_id=%s: %s",
+        interview.id,
+        content,
+    )
+    try:
+        parsed = json.loads(content)
+        summary = str(parsed.get("summary", "")).strip()
+        if not summary:
+            summary = "No summary generated."
+    except json.JSONDecodeError as exc:
+        logger.error(
+            "Failed to parse Azure OpenAI report response for interview_id=%s: %s",
+            interview.id,
+            content,
+            exc_info=exc,
+        )
+        summary = "No summary generated."
+        parsed = {}
+
+    result = {
         "score": int(parsed.get("score", 0)),
         "recommendation": str(parsed.get("recommendation", "borderline")),
-        "summary": str(parsed.get("summary", "No summary generated.")),
-        "strengths": "\n".join(parsed.get("strengths", [])),
-        "concerns": "\n".join(parsed.get("concerns", [])),
+        "summary": summary,
+        "strengths": "\n".join(parsed.get("strengths", []) or []),
+        "concerns": "\n".join(parsed.get("concerns", []) or []),
     }
+    logger.info(
+        "Azure OpenAI report parsed for interview_id=%s: score=%s recommendation=%s summary_len=%s",
+        interview.id,
+        result["score"],
+        result["recommendation"],
+        len(result["summary"]),
+    )
+    return result

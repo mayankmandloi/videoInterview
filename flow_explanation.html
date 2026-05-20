@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Interview - Application Flow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --bg: #030712;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --text: #f9fafb;
+            --text-dim: #9ca3af;
+            --accent: #10b981;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 6rem;
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #fff, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        section {
+            margin-bottom: 8rem;
+            position: relative;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 2.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        h2::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 4px;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(to right, transparent, var(--primary), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover::after {
+            opacity: 1;
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .card p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+
+        .mermaid-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 32px;
+            padding: 3rem;
+            margin-bottom: 3rem;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .workflow-step {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 3rem;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            background: var(--primary);
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .step-content h4 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-content p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+
+        .tech-pill {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 100px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 4rem 0;
+            border-top: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .container { padding: 2rem 1rem; }
+            .mermaid-container { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>System Flow</h1>
+            <p class="subtitle">An architectural breakdown of the AI Video Interview POC platform.</p>
+        </header>
+
+        <section id="architecture">
+            <h2>Architecture Overview</h2>
+            <div class="mermaid-container">
+                <div class="mermaid">
+                    graph TD
+                        A[Admin] -->|Schedule| B(FastAPI Server)
+                        B -->|Store| C[(SQLite DB)]
+                        D[Candidate] -->|Join| B
+                        B -->|Dispatch| E[LiveKit Agent]
+                        E -->|Interact| D
+                        E -->|STT / TTS| F[Inference APIs]
+                        E -->|Brain| G[Azure OpenAI]
+                        D -->|Status| B
+                        B -->|Final Report| G
+                        G -->|JSON| B
+                        B -->|View| A
+                        
+                        style B fill:#1e1b4b,stroke:#6366f1,stroke-width:2px
+                        style E fill:#1e1b4b,stroke:#10b981,stroke-width:2px
+                        style G fill:#1e1b4b,stroke:#8b5cf6,stroke-width:2px
+                </div>
+            </div>
+            <div class="card-grid">
+                <div class="card">
+                    <h3>FastAPI Orchestrator</h3>
+                    <p>The central hub managing authentication, database persistence, and external API coordination.</p>
+                </div>
+                <div class="card">
+                    <h3>LiveKit Agents</h3>
+                    <p>Real-time AI participants that join video rooms as autonomous technical interviewers.</p>
+                </div>
+                <div class="card">
+                    <h3>Azure OpenAI</h3>
+                    <p>Powers the underlying intelligence for both real-time conversation and post-interview analysis.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="workflows">
+            <h2>Deep Dive: Workflows</h2>
+            
+            <div style="margin-bottom: 4rem;">
+                <h3 style="font-size: 1.75rem; margin-bottom: 2rem; color: var(--accent);">Admin Experience</h3>
+                <div class="workflow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Secure Login</h4>
+                        <p>Recruiters authenticate using the admin dashboard to manage candidate pools.</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Interview Configuration</h4>
+                        <p>Admins define the role (e.g., "Senior Backend Engineer") and specific skills (e.g., "Python, Distributed Systems") for the AI to assess.</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Report Review</h4>
+                        <p>Structured evaluations are presented with scores, strengths, and hire/no-hire recommendations.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 style="font-size: 1.75rem; margin-bottom: 2rem; color: var(--primary);">Candidate Journey</h3>
+                <div class="workflow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Unique Access</h4>
+                        <p>Candidates join via a tokenized URL that instantly sets up their video and audio peripherals.</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Live AI Dispatch</h4>
+                        <p>Upon starting, the server dispatches a dedicated AI agent to the LiveKit room to conduct the interview.</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Real-time Assessment</h4>
+                        <p>The AI uses voice-to-voice interaction to probe the candidate's technical depth, capturing transcripts for analysis.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tech-stack">
+            <h2>Technology Stack</h2>
+            <div class="card" style="width: 100%;">
+                <div style="margin-bottom: 2rem;">
+                    <span class="tech-pill">Python 3.10+</span>
+                    <span class="tech-pill">FastAPI</span>
+                    <span class="tech-pill">SQLAlchemy</span>
+                    <span class="tech-pill">LiveKit Python SDK</span>
+                    <span class="tech-pill">Azure OpenAI SDK</span>
+                    <span class="tech-pill">Jinja2</span>
+                </div>
+                <p style="margin-bottom: 1.5rem;">The application is built for high performance and low-latency interaction. By offloading heavy AI processing to specialized providers (LiveKit Inference, Azure), the core application remains lightweight and scalable.</p>
+                <div class="mermaid">
+                    graph LR
+                        STT[Deepgram] --> Agent[LiveKit Agent]
+                        Agent --> LLM[GPT-4o]
+                        LLM --> Agent
+                        Agent --> TTS[Cartesia]
+                        
+                        style Agent fill:#1e1b4b,stroke:#6366f1
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>&copy; 2026 AI Video Interview POC. Built with precision.</p>
+        </footer>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            securityLevel: 'loose',
+            fontFamily: 'Outfit',
+            themeVariables: {
+                primaryColor: '#6366f1',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#6366f1',
+                lineColor: '#4b5563',
+                secondaryColor: '#10b981',
+                tertiaryColor: '#1f2937'
+            }
+        });
+    </script>
+</body>
+</html>

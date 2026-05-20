@@ -10,6 +10,12 @@
   <span class="badge">{{ interview.status }}</span>
 </header>
 
+{% if message %}
+<div class="panel" style="margin-bottom:1rem; padding:1rem; border-radius:8px; border:1px solid {{ '#10b981' if message_type == 'success' else '#f87171' }}; background: {{ '#ecfdf5' if message_type == 'success' else '#fef2f2' }}; color: {{ '#065f46' if message_type == 'success' else '#991b1b' }};">
+  {{ message }}
+</div>
+{% endif %}
+
 {% if interview.report %}
 <section class="score-grid">
   <div class="panel">
@@ -18,7 +24,12 @@
     <p class="muted">Recommendation: {{ interview.report.recommendation }}</p>
   </div>
   <div class="panel">
-    <h2>Summary</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+      <h2>Summary</h2>
+      <form method="post" action="/admin/interviews/{{ interview.id }}/regenerate-report">
+        <button class="secondary" type="submit">Regenerate summary</button>
+      </form>
+    </div>
     <p>{{ interview.report.summary }}</p>
   </div>
 </section>
@@ -38,6 +49,31 @@
   <p class="muted">The report appears after the candidate finishes the interview.</p>
 </section>
 {% endif %}
+
+<section class="panel">
+  <h2>🔍 Integrity Report</h2>
+  {% if interview.cheating_flags %}
+  <div style="background:#fee2e2;border:1px solid #f87171;padding:1rem;border-radius:6px;margin-bottom:1rem;">
+    ⚠️ <strong>{{ interview.cheating_flags | length }} integrity flag(s) detected during this interview.</strong>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Flag Type</th><th>Detail</th><th>Time (UTC)</th></tr></thead>
+      <tbody>
+        {% for flag in interview.cheating_flags %}
+        <tr>
+          <td><span class="badge">{{ flag.flag_type }}</span></td>
+          <td>{{ flag.detail or "—" }}</td>
+          <td class="muted">{{ flag.occurred_at.strftime("%H:%M:%S") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:green">✅ No integrity issues detected.</p>
+  {% endif %}
+</section>
 
 <section class="panel">
   <h2>Transcript</h2>

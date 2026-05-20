@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db import Interview, InterviewStatus, Report, TranscriptTurn, get_db
+from app.db import CheatingFlag, Interview, InterviewStatus, Report, TranscriptTurn, get_db
 from app.services.azure_openai import generate_report
 from app.services.livekit import build_room_name, create_livekit_token, dispatch_agent
 
@@ -13,6 +14,11 @@ router = APIRouter()
 
 class AnswerPayload(BaseModel):
     answer: str = Field(min_length=1, max_length=8000)
+
+
+class FlagPayload(BaseModel):
+    flag_type: str = Field(min_length=1, max_length=64)
+    detail: str | None = Field(default=None, max_length=500)
 
 
 @router.get("/interview/{token}")
@@ -43,11 +49,18 @@ def start_interview(token: str, db: Session = Depends(get_db)):
         db.commit()
 
     room_name = build_room_name(interview.id)
-    livekit_token = create_livekit_token(
-        f"candidate-{interview.id}",
-        room_name,
-        name=interview.candidate_name,
-    )
+    try:
+        livekit_token = create_livekit_token(
+            f"candidate-{interview.id}",
+            room_name,
+            name=interview.candidate_name,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"LiveKit token creation failed: {exc}",
+        ) from exc
+
     return {
         "room": room_name,
         "livekitToken": livekit_token,
@@ -92,6 +105,20 @@ def answer_question(token: str, payload: AnswerPayload, db: Session = Depends(ge
     db.add(TranscriptTurn(interview_id=interview.id, speaker="note", text=payload.answer.strip()))
     db.commit()
     return {"status": "saved"}
+
+
+@router.post("/api/interviews/{token}/flag")
+def flag_cheating(token: str, payload: FlagPayload, db: Session = Depends(get_db)):
+    interview = db.query(Interview).filter_by(token=token).first()
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview link not found")
+    db.add(CheatingFlag(
+        interview_id=interview.id,
+        flag_type=payload.flag_type,
+        detail=payload.detail,
+    ))
+    db.commit()
+    return {"status": "flagged"}
 
 
 @router.post("/api/interviews/{token}/finish")
